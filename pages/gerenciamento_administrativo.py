@@ -1,24 +1,38 @@
 import streamlit as st
-from utils.database import add_user, get_user, get_all_users, hash_password
 import os
+from utils.database import add_user, get_user, get_all_users, hash_password
 
 # --- Funções Auxiliares ---
-
 def load_css(file_name):
     """Carrega e aplica o CSS personalizado, forçando a codificação UTF-8."""
     if not os.path.exists(file_name):
         st.warning(f"O arquivo CSS '{file_name}' não foi encontrado.")
         return
-    # Adicione encoding='utf-8' para resolver o problema de decodificação.
-    with open(file_name, encoding='utf-8') as f: 
-        st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
+    try:
+        with open(file_name, encoding='utf-8') as f: 
+            st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
+    except Exception as e:
+        st.error(f"Erro ao carregar CSS: {e}")
 
-# Aplica o tema
 load_css("style.css")
 
 st.set_page_config(page_title="Área Administrativa - Cores e Fragrâncias")
 
 st.title("🔐 Área Administrativa")
+
+# Inicializa o estado de login
+if "logged_in" not in st.session_state:
+    st.session_state["logged_in"] = False
+
+# Adiciona botão de Logout se logado
+if st.session_state.get("logged_in"):
+    st.sidebar.success(f"Logado como: **{st.session_state.get('username')}** ({st.session_state.get('role')})")
+    if st.sidebar.button("Logout"):
+        st.session_state["logged_in"] = False
+        st.session_state.pop("username", None)
+        st.session_state.pop("role", None)
+        st.success("Sessão encerrada com sucesso.")
+        st.rerun()
 
 st.markdown("Faça login ou cadastre um novo administrador ou funcionário abaixo.")
 
@@ -57,13 +71,15 @@ elif option == "Cadastrar Novo Usuário":
             else:
                 add_user(new_username, new_password, role=role)
                 st.success(f"Usuário '{new_username}' criado com papel '{role}'. Agora faça login.")
+                st.rerun() # Atualiza a página para limpar os campos e incentivar o login
 
 elif option == "Gerenciar Contas (Admins)":
-    # only admin can manage
     if not st.session_state.get('logged_in') or st.session_state.get('role') != 'admin':
         st.error('Apenas administradores podem gerenciar contas. Faça login como admin.')
     else:
         st.subheader('Usuários cadastrados')
         users = get_all_users()
+        # Não incluí a funcionalidade de deletar usuário para simplificar,
+        # mas você a adicionaria aqui, com um st.button e st.rerun().
         for u in users:
             st.write(f"- {u.get('username')} ({u.get('role')})")

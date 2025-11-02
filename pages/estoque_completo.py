@@ -3,23 +3,23 @@ from utils.database import get_all_produtos
 import os
 
 # --- Funções Auxiliares ---
-
 def load_css(file_name):
-    """Carrega e aplica o CSS personalizado, forçando a codificação UTF-8."""
     if not os.path.exists(file_name):
         st.warning(f"O arquivo CSS '{file_name}' não foi encontrado.")
         return
-    # Adicione encoding='utf-8' para resolver o problema de decodificação.
-    with open(file_name, encoding='utf-8') as f: 
-        st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
+    try:
+        with open(file_name, encoding='utf-8') as f: 
+            st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
+    except Exception as e:
+        st.error(f"Erro ao carregar CSS: {e}")
 
-# Aplica o tema
 load_css("style.css")
 
 st.set_page_config(page_title="Estoque - Cores e Fragrâncias")
 
 st.title("📦 Estoque Completo")
 
+# 🔄 CHAMADA CRÍTICA: Obter dados mais recentes
 produtos = get_all_produtos()
 
 if not produtos:
@@ -54,16 +54,39 @@ else:
     # Exibição dos produtos filtrados
     for p in produtos_filtrados:
         st.markdown(f"### **{p.get('nome')}**")
-        st.write(f"**Preço:** R$ {float(p.get('preco')):.2f}")
-        st.write(f"**Quantidade:** {p.get('quantidade')}")
+        
+        # TRATAMENTO DE ERRO: Preço e Quantidade
+        try:
+            preco_formatado = f"R$ {float(p.get('preco')):.2f}"
+            quantidade_int = int(p.get('quantidade', 0))
+        except (ValueError, TypeError):
+            preco_formatado = "R$ N/A"
+            quantidade_int = "N/A"
+
+        st.write(f"**Preço:** {preco_formatado}")
+        st.write(f"**Quantidade:** {quantidade_int}")
         st.write(f"**Marca:** {p.get('marca')}")
         st.write(f"**Estilo:** {p.get('estilo')}")
         st.write(f"**Tipo:** {p.get('tipo')}")
-        st.write(f"**Validade:** {p.get('data_validade')}")
+        st.write(f"**Validade:** {p.get('data_validade') or 'N/A'}")
+        
+        # TRATAMENTO DE ERRO: Carregamento da foto
         if p.get("foto"):
-            try:
-                # O caminho da foto depende da sua estrutura
-                st.image(f"assets/{p.get('foto')}", width=180)
-            except Exception:
-                st.info("Erro ao carregar imagem; verifique assets/")
+            photo_path = os.path.join("assets", p.get('foto'))
+            if os.path.exists(photo_path):
+                try:
+                    st.image(photo_path, width=180)
+                except Exception:
+                    st.info("Erro ao carregar imagem.")
+            else:
+                st.info("Sem foto ou caminho inválido.")
+                
         st.markdown("---")
+
+    # Cálculo do valor total em estoque (filtrado) - Robusto
+    total_estoque = sum(
+        (float(p.get("preco", 0)) if p.get("preco") else 0) * (int(p.get("quantidade", 0)) if p.get("quantidade") else 0)
+        for p in produtos_filtrados
+    )
+    
+    st.success(f"💰 Valor Total em Estoque (filtrado): R$ {total_estoque:,.2f}")
